@@ -1,6 +1,7 @@
 import { ethers } from "ethers";
 import ibBTCabi from '/abis/ibBTCABI.json';
 import rBTCabi from '/abis/rBTCABI.json';
+import bProabi from '/abis/bProABI.json';
 
 export default async function handler(req, res) {
     const { slug } = req.query
@@ -12,8 +13,12 @@ export default async function handler(req, res) {
             res.status(200).json({ apyFromLastWeek: apyFromLastWeek })
             break
         case 'rbtc':
-            const nextSupplyInterestRate = await fetchRbtcApy()
+            const nextSupplyInterestRate = await fetchSovrynApy('0xa9DcDC63eaBb8a2b6f39D7fF9429d88340044a7A', rBTCabi)
             res.status(200).json({ nextSupplyInterestRate: nextSupplyInterestRate })
+            break
+        case 'bpro':
+            const interestRate = await fetchSovrynApy('0x6E2fb26a60dA535732F8149b25018C9c0823a715', bProabi)
+            res.status(200).json({ nextSupplyInterestRate: interestRate })
             break
         default:
             res.status(404).send()
@@ -40,19 +45,17 @@ async function fetchIbbtcApyFromTimestamp(timestamp) {
         return null
     }
 }
-
-async function fetchRbtcApy() {
+async function fetchSovrynApy(contractAddress, abi) {
     // This logic is based off of https://github.com/DistributedCollective/Sovryn-frontend > src/app/components/NextSupplyInterestRate/index.tsx
     try {
         const provider = new ethers.providers.JsonRpcProvider('https://public-node.rsk.co')
-        const contractAddress = '0xa9DcDC63eaBb8a2b6f39D7fF9429d88340044a7A'
-        const contract = new ethers.Contract(contractAddress, rBTCabi, provider)
-        // TODO: "1" below represents the amount of rBTC that will be lent.  When connecting a user's wallet, use their balance instead of this arbitrary number.
+        const contract = new ethers.Contract(contractAddress, abi, provider)
+        // TODO: "1" below represents the amount of token that will be lent.  When connecting a user's wallet, use their balance instead of this arbitrary number.
         const apy = await contract.nextSupplyInterestRate('1')
         const fixedAPY = ethers.FixedNumber.from(apy).divUnsafe(ethers.FixedNumber.from(ethers.BigNumber.from("10").pow(20)))
         return fixedAPY.round(6).toString()
     } catch (error) {
-        console.error(`Error while getting rBTC APY: ${error}`)
+        console.error(`Error while getting ${contractAddress} APY: ${error}`)
         return null
     }
 }
