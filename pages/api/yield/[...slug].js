@@ -20,6 +20,13 @@ export default async function handler(req, res) {
             const interestRate = await fetchSovrynApy('0x6E2fb26a60dA535732F8149b25018C9c0823a715', bProabi)
             res.status(200).json({ nextSupplyInterestRate: interestRate })
             break
+        case 'ledn':
+            let tier1Apy = await fetchHTMLApy('https://platform.ledn.io/rates', '#main-body > main > div > p:nth-child(3) > table:nth-child(1) > tr:nth-child(2) > td:nth-child(3)')
+            // Format into a consistent format.
+            tier1Apy = tier1Apy.substring(0, (tier1Apy.length - 1)) / 100
+            const tier2Apy = await fetchHTMLApy('https://platform.ledn.io/rates', '#main-body > main > div > p:nth-child(3) > table:nth-child(1) > tr:nth-child(3) > td:nth-child(3)')
+            res.status(200).json({ tier1APY: tier1Apy, tier2Apy: tier2Apy })
+            break
         default:
             res.status(404).send()
     }
@@ -56,6 +63,25 @@ async function fetchSovrynApy(contractAddress, abi) {
         return fixedAPY.round(6).toString()
     } catch (error) {
         console.error(`Error while getting ${contractAddress} APY: ${error}`)
+        return null
+    }
+}
+
+async function fetchHTMLApy(apiURL, selector) {
+    try {
+        const puppeteer = require('puppeteer')
+        const browser = await puppeteer.launch()
+        const page = await browser.newPage()
+        await page.goto(apiURL)
+        let apy = await page.evaluate((sel) => {
+            let element = document.querySelector(sel)
+            return element? element.innerHTML: null
+        }, selector)
+        await browser.close()
+
+        return apy.toString()
+    } catch (error) {
+        console.error(`Error while getting APY: ${error}`)
         return null
     }
 }
