@@ -55,7 +55,8 @@ export default function Home({ allOpportunities }) {
 }
 
 export function Rate(props) {
-    const { data, error } = useSWR(props.opp.api, fetcher)
+    const endpoint = (typeof props.opp.api !== 'undefined' ? props.opp.api : '/api/yield/' + props.opp.id)
+    const { data, error } = useSWR(endpoint, fetcher)
 
     // Parse the rate data from response.
     if (!error && typeof data !== 'undefined') {
