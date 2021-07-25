@@ -1,4 +1,5 @@
 import { ethers } from "ethers";
+import { getOpportunity } from '../../../lib/opportunities'
 import ibBTCabi from '/abis/ibBTCABI.json';
 import rBTCabi from '/abis/rBTCABI.json';
 import bProabi from '/abis/bProABI.json';
@@ -20,15 +21,22 @@ export default async function handler(req, res) {
             const interestRate = await fetchSovrynApy('0x6E2fb26a60dA535732F8149b25018C9c0823a715', bProabi)
             res.status(200).json({ nextSupplyInterestRate: interestRate })
             break
-        case 'ledn':
-            let tier1Apy = await fetchHTMLApy('https://platform.ledn.io/rates', '#main-body > main > div > p:nth-child(3) > table:nth-child(1) > tr:nth-child(2) > td:nth-child(3)')
-            // Format into a consistent format.
-            tier1Apy = tier1Apy.substring(0, (tier1Apy.length - 1)) / 100
-            const tier2Apy = await fetchHTMLApy('https://platform.ledn.io/rates', '#main-body > main > div > p:nth-child(3) > table:nth-child(1) > tr:nth-child(3) > td:nth-child(3)')
-            res.status(200).json({ tier1APY: tier1Apy, tier2Apy: tier2Apy })
-            break
         default:
-            res.status(404).send()
+            let opp = getOpportunity(slug[0])
+            if (opp !== null) {
+                let apy = await fetchHTMLApy(opp.html_source, opp.html_selector)
+                if (typeof opp.html_regex !== 'undefined') {
+                    // A regular expression was provided to clean up and format this data.
+                    let regE = new RegExp(opp.html_regex)
+                    let cleanApy = regE.exec(apy)
+                    apy = cleanApy[0]
+                }
+                // Format data in a consistent manner
+                res.status(200).json({apy: ethers.FixedNumber.from(apy.substring(0, (apy.length))).divUnsafe(ethers.FixedNumber.from(100)).round(6).toString()})
+            } else {
+                res.status(404).send()
+            }
+            break
     }
 }
 
@@ -72,13 +80,17 @@ async function fetchHTMLApy(apiURL, selector) {
         const puppeteer = require('puppeteer')
         const browser = await puppeteer.launch()
         const page = await browser.newPage()
+        // Set some additional headers to this request so it works for sites that are blocking headless requests per https://github.com/puppeteer/puppeteer/issues/665
+        await page.setExtraHTTPHeaders({
+            'Accept-Language': 'en-GB,en-US;q=0.9,en;q=0.8'
+        })
+        await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/66.0.3359.181 Safari/537.36')
         await page.goto(apiURL)
         let apy = await page.evaluate((sel) => {
             let element = document.querySelector(sel)
             return element? element.innerHTML: null
         }, selector)
         await browser.close()
-
         return apy.toString()
     } catch (error) {
         console.error(`Error while getting APY: ${error}`)
