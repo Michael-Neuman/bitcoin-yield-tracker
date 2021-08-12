@@ -5,8 +5,10 @@ import rBTCabi from '/abis/rBTCABI.json';
 import bProabi from '/abis/bProABI.json';
 
 export default async function handler(req, res) {
-    const { slug } = req.query
-    switch(slug[0]) {
+    const { '...slug': slug } = req.query
+    // Pull in any configuration data available from opportunity definition file.
+//TODO: come up with .md data format that accomodates multiple rate tiers
+    switch(slug) {
         case 'ibbtc':
             const dayOldBlock = 86400 // [Seconds in a day]
             const weekOldBlock = dayOldBlock * 7
@@ -22,7 +24,7 @@ export default async function handler(req, res) {
             res.status(200).json({ nextSupplyInterestRate: interestRate })
             break
         default:
-            let opp = getOpportunity(slug[0])
+            let opp = getOpportunity(slug)
             if (opp !== null) {
                 let apy = await fetchHTMLApy(opp.html_source, opp.html_selector)
                 if (typeof opp.html_regex !== 'undefined') {
@@ -34,6 +36,7 @@ export default async function handler(req, res) {
                 // Format data in a consistent manner
                 res.status(200).json({apy: ethers.FixedNumber.from(apy.substring(0, (apy.length))).divUnsafe(ethers.FixedNumber.from(100)).round(6).toString()})
             } else {
+                console.error(`Opportunity ${slug} not found in request query: %j`, req.query)
                 res.status(404).send()
             }
             break
@@ -77,8 +80,22 @@ async function fetchSovrynApy(contractAddress, abi) {
 
 async function fetchHTMLApy(apiURL, selector) {
     try {
-        const puppeteer = require('puppeteer')
-        const browser = await puppeteer.launch()
+        let chrome = {};
+        let puppeteer;
+
+        if (process.env.AWS_LAMBDA_FUNCTION_VERSION) {
+            // running on the Vercel platform.
+            chrome = require('chrome-aws-lambda');
+            puppeteer = require('puppeteer-core');
+        } else {
+            // running locally.
+            puppeteer = require('puppeteer');
+        }
+
+        const browser = await puppeteer.launch({
+            args: chrome.args,
+            executablePath: await chrome.executablePath,
+        })
         const page = await browser.newPage()
         // Set some additional headers to this request so it works for sites that are blocking headless requests per https://github.com/puppeteer/puppeteer/issues/665
         await page.setExtraHTTPHeaders({

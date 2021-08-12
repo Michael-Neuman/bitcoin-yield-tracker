@@ -1,0 +1,8 @@
+{
+  "functions": {
+    "api/yield/[...slug].js": {
+      "includeFiles": "opportunities/**",
+      "runtime": "@vercel/node@1.12.1"
+    }
+  }
+}
