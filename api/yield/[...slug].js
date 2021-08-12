@@ -1,8 +1,8 @@
 import { ethers } from "ethers";
-import { getOpportunity } from '../../../lib/opportunities'
-import ibBTCabi from '/abis/ibBTCABI.json';
-import rBTCabi from '/abis/rBTCABI.json';
-import bProabi from '/abis/bProABI.json';
+import { getOpportunity } from '../../lib/opportunities'
+import ibBTCabi from '../../abis/ibBTCABI.json';
+import rBTCabi from '../../abis/rBTCABI.json';
+import bProabi from '../../abis/bProABI.json';
 
 export default async function handler(req, res) {
     const { '...slug': slug } = req.query
